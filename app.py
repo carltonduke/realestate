@@ -3,8 +3,13 @@ import pandas as pd
 import numpy as np
 import requests
 
+cache = {}
+
 def get_permits(address):
     address = address.upper()
+    if address in cache:
+        return cache[address]
+
     url = f"https://data.austintexas.gov/resource/3syk-w9eu.json?original_address1={address}"
 
     response = requests.get(url)
@@ -16,7 +21,11 @@ def get_permits(address):
              'permit_class', 'permit_location','description',
              'tcad_id', 'total_job_valuation']]
 
+    if address not in cache:
+        cache[address] = df
+
     return df
+
 
 st.title('Property Verification')
 
