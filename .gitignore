@@ -1,1 +1,6 @@
 .venv/
+.env
+page.html
+scraper/__pycache__
+scraper/test1.ipynb
+__pycache__/
