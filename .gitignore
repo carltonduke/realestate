@@ -3,4 +3,7 @@
 page.html
 scraper/__pycache__
 scraper/test1.ipynb
+scraper/test2.ipynb
+scraper/out/
 __pycache__/
+.streamlit/

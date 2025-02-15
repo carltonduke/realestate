@@ -3,62 +3,81 @@ import pandas as pd
 import numpy as np
 import requests
 from dotenv import load_dotenv
+from os import environ
 
-from scraper import get_page
+from scraper.scraper import get_page
+from utils.common import get_permits, get_prop_info, get_owner_info
 
 load_dotenv()
+URL = environ.get("CORPORATE_URL")
 
-cache = {}
+st.set_page_config(
+    page_title="property report", page_icon="🖼️", initial_sidebar_state="collapsed"
+)
 
-def get_permits(address):
-    """Return table of permits pulled from web api.
+st.session_state["data_store"] = {}
 
-    Args:
-        address (str): Address to search.
+# Start content
+st.title('Property Report')
+st.text("")
 
-    Returns:
-        pandas.DataFrame: Resulting table. Has columns
-        ['permittype','permit_type_desc','permit_number', 
-        'permit_class', 'permit_location','description','tcad_id', 'total_job_valuation']].
-    """
-    address = address.upper()
-    if address in cache:
-        return cache[address]
+input_container = st.container(border=True)
+input_container.header('Address')
 
-    URL_BASE = os.environ.get("ADDRESS_URL")
-    url = URL_BASE + address
+text_in_col, go_button_col = input_container.columns([0.8, 0.2])
+text = text_in_col.text_input(label="address", label_visibility="collapsed")
 
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
+if go_button_col.button("Go"):
+    if text:
+        st.session_state['address'] = text
 
-    df = pd.DataFrame(data)
+tab_titles = ["Property", "Owner", "Permits"]
+tab1, tab2, tab3 = st.tabs(tab_titles)
 
-    if df.empty:
-        print(f"No data found for {address}")
-        return None
+if 'address' in st.session_state:
+    address = st.session_state['address']
+    data_store = st.session_state['data_store']
 
-    df = df[['permittype','permit_type_desc','permit_number', 
-             'permit_class', 'permit_location','description',
-             'tcad_id', 'total_job_valuation']]
-
-    if address not in cache:
-        cache[address] = df
-
-    return df
-
-
-st.title('Property Verification')
-
-st.subheader('Permit Data')
-text = st.text_input("Address")
-
-if st.button("Go"):
-    df = get_permits(text)
-    st.text("Permits Table")
-    st.dataframe(df, use_container_width=True)
-
+    if address not in data_store:
+        page_source = get_page(URL, address)
+        data_store[address] = {'page_source':page_source,
+                                'prop_info':None,
+                                'owner_info':None,
+                                'permits':None}
     
+    if not data_store[address]['prop_info']: 
+        prop_info = get_prop_info(data_store[address]['page_source'])
+        data_store[address]['prop_info'] = prop_info
+    else:
+        prop_info = data_store[address]['prop_info']
+
+    if not data_store[address]['owner_info']: 
+        owner_info = get_owner_info(data_store[address]['page_source'])
+        data_store[address]['owner_info'] = owner_info
+    else:
+        owner_info = data_store[address]['owner_info']
+
+    if not data_store[address]['permits']: 
+        df = get_permits(address)
+        data_store[address]['permits'] = df
+    else:
+        df = data_store[address]['permits']
+
+    st.session_state['data_store'] = data_store
+
+    tab1.markdown(f''':blue-background[**ID**]   :blue[{prop_info['Property ID']}]''')
+    tab1.markdown(f''':gray-background[**Legal Description**]   :green[{prop_info['Legal Description']}]''')
+    tab1.markdown(f''':gray-background[**Property Use**]   :green[{prop_info['Property Use']}]''')
+    tab1.markdown(f''':gray-background[**Agent**]   :green[{prop_info['Agent']}]''')
+
+    tab2.markdown(f''':blue-background[**ID**]   :blue[{owner_info['Owner ID']}]''')
+    tab2.markdown(f''':gray-background[**Name**]   {owner_info['Name']}''')
+    tab2.markdown(f''':gray-background[**State Code**]   {owner_info['State Code']}''')
+
+    tab3.dataframe(df, use_container_width=True)
+
+
+st.write("")
 st.divider()
 disclaimer = """We makes no warranties, expressed or implied, concerning the accuracy, completeness, reliability, or suitability of the information provided."""
 st.text(disclaimer)
